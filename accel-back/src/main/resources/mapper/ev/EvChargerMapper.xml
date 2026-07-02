@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.accel.api.ev.dao.EvChargerDao">
+
+	<insert id="upsertChargerMasterBatch">
+		INSERT INTO ev_charger
+			(cs_id, cp_id, cp_nm, charge_tp, cp_tp, cp_stat, stat_update_datetime, created_at, updated_at)
+		VALUES
+		<foreach collection="list" item="c" separator=",">
+			(#{c.csId}, #{c.cpId}, #{c.cpNm}, #{c.chargeTp}, #{c.cpTp}, #{c.cpStat}, #{c.statUpdateDatetime}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		</foreach>
+		ON DUPLICATE KEY UPDATE
+			cp_nm                = VALUES(cp_nm),
+			charge_tp            = VALUES(charge_tp),
+			cp_tp                = VALUES(cp_tp),
+			cp_stat              = VALUES(cp_stat),
+			stat_update_datetime = VALUES(stat_update_datetime),
+			updated_at           = CURRENT_TIMESTAMP
+	</insert>
+
+	<insert id="updateChargerStatusBatch">
+		INSERT INTO ev_charger
+			(cs_id, cp_id, cp_stat, stat_update_datetime, created_at, updated_at)
+		VALUES
+		<foreach collection="list" item="c" separator=",">
+			(#{c.csId}, #{c.cpId}, #{c.cpStat}, #{c.statUpdateDatetime}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		</foreach>
+		ON DUPLICATE KEY UPDATE
+			cp_stat              = VALUES(cp_stat),
+			stat_update_datetime = VALUES(stat_update_datetime),
+			updated_at           = CURRENT_TIMESTAMP
+	</insert>
+
+</mapper>

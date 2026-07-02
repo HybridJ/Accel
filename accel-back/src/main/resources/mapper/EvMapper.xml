@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.accel.api.ev.EvDao">
+
+	<resultMap id="evResultMap" type="Ev">
+		<id property="csId" column="cs_id"/>
+		<result property="csName" column="cs_nm"/>
+		<result property="addr" column="addr"/>
+		<result property="lat" column="lat"/>
+		<result property="longi" column="longi"/>
+		<result property="distanceKm" column="distance_km"/>
+		<collection property="chargers" ofType="com.accel.api.ev.Ev$Charger" notNullColumn="cp_id">
+			<id property="cpId" column="cp_id"/>
+			<result property="cpNm" column="cp_nm"/>
+			<result property="chargeTp" column="charge_tp"/>
+			<result property="cpTp" column="cp_tp"/>
+			<result property="cpStat" column="cp_stat"/>
+			<result property="statUpdateDatetime" column="stat_update_datetime"/>
+		</collection>
+	</resultMap>
+
+	<select id="selectNearestStations" resultMap="evResultMap">
+		SELECT
+			nearest.cs_id,
+			nearest.cs_nm,
+			nearest.addr,
+			nearest.lat,
+			nearest.longi,
+			nearest.distance_km,
+			c.cp_id,
+			c.cp_nm,
+			c.charge_tp,
+			c.cp_tp,
+			c.cp_stat,
+			c.stat_update_datetime
+		FROM (
+			SELECT
+				s.cs_id,
+				s.cs_nm,
+				s.addr,
+				CAST(TRIM(s.lat) AS DECIMAL(12, 8)) AS lat,
+				CAST(TRIM(s.longi) AS DECIMAL(12, 8)) AS longi,
+				(
+					6371 * ACOS(
+						LEAST(1, GREATEST(-1,
+							COS(RADIANS(#{lat})) * COS(RADIANS(CAST(TRIM(s.lat) AS DECIMAL(12, 8))))
+							* COS(RADIANS(CAST(TRIM(s.longi) AS DECIMAL(12, 8))) - RADIANS(#{longi}))
+							+ SIN(RADIANS(#{lat})) * SIN(RADIANS(CAST(TRIM(s.lat) AS DECIMAL(12, 8))))
+						))
+					)
+				) AS distance_km
+			FROM ev_station s
+			WHERE s.lat IS NOT NULL
+				AND TRIM(s.lat) != ''
+				AND TRIM(s.lat) REGEXP '^-?[0-9]+([.][0-9]+)?$'
+				AND s.longi IS NOT NULL
+				AND TRIM(s.longi) != ''
+				AND TRIM(s.longi) REGEXP '^-?[0-9]+([.][0-9]+)?$'
+				AND CAST(TRIM(s.lat) AS DECIMAL(12, 8)) BETWEEN -90 AND 90
+				AND CAST(TRIM(s.longi) AS DECIMAL(12, 8)) BETWEEN -180 AND 180
+				AND EXISTS (
+					SELECT 1
+					FROM ev_charger available
+					WHERE available.cs_id = s.cs_id
+						AND TRIM(available.cp_stat) = '1'
+				)
+			ORDER BY distance_km
+			LIMIT #{limit}
+		) nearest
+		LEFT JOIN ev_charger c ON c.cs_id = nearest.cs_id
+		ORDER BY nearest.distance_km, nearest.cs_id, c.cp_id
+	</select>
+
+	<select id="selectStationsByNeighborhood" resultMap="evResultMap">
+		SELECT
+			neighborhood.cs_id,
+			neighborhood.cs_nm,
+			neighborhood.addr,
+			neighborhood.lat,
+			neighborhood.longi,
+			neighborhood.distance_km,
+			c.cp_id,
+			c.cp_nm,
+			c.charge_tp,
+			c.cp_tp,
+			c.cp_stat,
+			c.stat_update_datetime
+		FROM (
+			SELECT
+				s.cs_id,
+				s.cs_nm,
+				s.addr,
+				CAST(TRIM(s.lat) AS DECIMAL(12, 8)) AS lat,
+				CAST(TRIM(s.longi) AS DECIMAL(12, 8)) AS longi,
+				(
+					6371 * ACOS(
+						LEAST(1, GREATEST(-1,
+							COS(RADIANS(#{lat})) * COS(RADIANS(CAST(TRIM(s.lat) AS DECIMAL(12, 8))))
+							* COS(RADIANS(CAST(TRIM(s.longi) AS DECIMAL(12, 8))) - RADIANS(#{longi}))
+							+ SIN(RADIANS(#{lat})) * SIN(RADIANS(CAST(TRIM(s.lat) AS DECIMAL(12, 8))))
+						))
+					)
+				) AS distance_km
+			FROM ev_station s
+			WHERE s.addr LIKE CONCAT('%', #{neighborhood}, '%')
+				AND s.lat IS NOT NULL
+				AND TRIM(s.lat) != ''
+				AND TRIM(s.lat) REGEXP '^-?[0-9]+([.][0-9]+)?$'
+				AND s.longi IS NOT NULL
+				AND TRIM(s.longi) != ''
+				AND TRIM(s.longi) REGEXP '^-?[0-9]+([.][0-9]+)?$'
+				AND CAST(TRIM(s.lat) AS DECIMAL(12, 8)) BETWEEN -90 AND 90
+				AND CAST(TRIM(s.longi) AS DECIMAL(12, 8)) BETWEEN -180 AND 180
+			ORDER BY distance_km
+		) neighborhood
+		LEFT JOIN ev_charger c ON c.cs_id = neighborhood.cs_id
+		ORDER BY neighborhood.distance_km, neighborhood.cs_id, c.cp_id
+	</select>
+
+</mapper>

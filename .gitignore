@@ -1,0 +1,30 @@
+/.metadata/
+.DS_Store
+bin/
+.env
+.env.*
+!.env.example
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+
+# Node / Vue
+node_modules/
+dist/
+
+# IDE / local workspace
+.metadata/
+.project
+.classpath
+.settings/
+.idea/
+.vscode/
+.agents/
+
+# Logs / temporary files
+*.log
+*.tmp
+~$*

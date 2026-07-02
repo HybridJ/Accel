@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.accel.api.board.BoardDao">
+	
+	<!-- 모든 게시판 목록(브랜드별) -->
+	<select id="selectAllBoards" resultType="Board">
+		SELECT brand_id, brand_name AS boardName, brand_name_ko AS boardNameKo,
+			   brand_slug AS brandSlug, is_domestic AS isDomestic
+		FROM brand
+	</select>
+
+	<!-- 특정 게시판 가져오기 -->
+	<select id="selectBoard" resultType="Board">
+		SELECT a.article_id AS articleId, a.user_id AS userId, a.title,
+			   (SELECT ai.image_url FROM article_img ai WHERE ai.article_id = a.article_id ORDER BY ai.display_order, ai.article_img_id LIMIT 1) AS imageUrl,
+			   a.created_at AS createdAt,
+			   a.test_drive_available AS testDriveAvailable,
+			   a.view_cnt AS viewCnt, a.brand_id AS brandId,
+			   (SELECT COUNT(*) FROM article_like al WHERE al.article_id = a.article_id) AS likeCount,
+			   COALESCE(b.brand_name, a.board_name) AS boardName,
+			   b.brand_name_ko AS boardNameKo
+		FROM article a
+		LEFT JOIN brand b ON a.brand_id = b.brand_id
+		WHERE a.brand_id = #{brandId}
+		ORDER BY a.created_at DESC
+	</select>
+
+	<!-- 특정 게시판 가져오기 (브랜드 슬러그로) -->
+	<select id="selectBoardBySlug" resultType="Board">
+		SELECT a.article_id AS articleId, a.user_id AS userId, a.title,
+			   (SELECT ai.image_url FROM article_img ai WHERE ai.article_id = a.article_id ORDER BY ai.display_order, ai.article_img_id LIMIT 1) AS imageUrl,
+			   a.created_at AS createdAt,
+			   a.test_drive_available AS testDriveAvailable,
+			   a.view_cnt AS viewCnt, a.brand_id AS brandId,
+			   (SELECT COUNT(*) FROM article_like al WHERE al.article_id = a.article_id) AS likeCount,
+			   COALESCE(b.brand_name, a.board_name) AS boardName,
+			   b.brand_name_ko AS boardNameKo
+		FROM article a
+		JOIN brand b ON a.brand_id = b.brand_id
+		WHERE b.brand_slug = #{brandSlug}
+		ORDER BY a.created_at DESC
+	</select>
+	
+	<!-- 특정 게시글 가져오기 -->
+	<select id="selectArticle" resultType="Board">
+		SELECT a.article_id AS articleId, a.user_id AS userId, a.title, a.content,
+			   (SELECT ai.image_url FROM article_img ai WHERE ai.article_id = a.article_id ORDER BY ai.display_order, ai.article_img_id LIMIT 1) AS imageUrl,
+			   a.created_at AS createdAt, a.updated_at AS updatedAt,
+			   a.test_drive_available AS testDriveAvailable,
+			   a.view_cnt AS viewCnt, a.brand_id AS brandId,
+			   COALESCE(b.brand_name, a.board_name) AS boardName,
+			   b.brand_name_ko AS boardNameKo
+		FROM article a
+		LEFT JOIN brand b ON a.brand_id = b.brand_id
+		WHERE a.article_id = #{articleId}
+	</select>
+
+	<update id="increaseArticleViewCount">
+		UPDATE article
+		SET view_cnt = COALESCE(view_cnt, 0) + 1
+		WHERE article_id = #{articleId}
+	</update>
+	
+	<!-- insertArticle 게시글 생성 -->
+	<insert id="insertArticle" useGeneratedKeys="true" keyProperty="board.articleId">
+		INSERT INTO article(user_id, title, content, test_drive_available, brand_id, board_name)
+		VALUES(#{board.userId}, #{board.title}, #{board.content}, #{board.testDriveAvailable}, #{board.brandId}, #{board.boardName})
+	</insert>
+
+	<select id="selectArticleImages" resultType="string">
+		SELECT image_url
+		FROM article_img
+		WHERE article_id = #{articleId}
+		ORDER BY display_order, article_img_id
+	</select>
+
+	<insert id="insertArticleImage">
+		INSERT INTO article_img(article_id, image_url, display_order)
+		VALUES(#{articleId}, #{imageUrl}, #{displayOrder})
+	</insert>
+
+	<delete id="deleteArticleImages">
+		DELETE FROM article_img
+		WHERE article_id = #{articleId}
+	</delete>
+
+	<delete id="deleteArticleLikes">
+		DELETE FROM article_like
+		WHERE article_id = #{articleId}
+	</delete>
+
+	<delete id="deleteCommentLikesByArticleId">
+		DELETE cl
+		FROM comment_like cl
+		JOIN comment c ON cl.comment_id = c.comment_id
+		WHERE c.article_id = #{articleId}
+	</delete>
+
+	<delete id="deleteCommentsByArticleId">
+		DELETE FROM comment
+		WHERE article_id = #{articleId}
+	</delete>
+	
+	<!-- updateArticle 게시글 수정 -->
+	<update id="updateArticle">
+		UPDATE article
+		<set>
+			<if test="board.title != null and board.title != ''">
+				title = #{board.title},
+			</if>
+			<if test="board.content != null and board.content != ''">
+				content = #{board.content},
+			</if>
+			test_drive_available = #{board.testDriveAvailable}
+		</set>
+		WHERE article_id = #{board.articleId}
+	</update>
+	
+	<!-- deleteArticle 게시글 삭제 -->
+	<delete id="deleteArticle">
+		DELETE FROM article
+		WHERE article_id = #{articleId}
+	</delete>
+
+	<!-- insertArticleLike 게시글 좋아요 등록 (중복 시 무시) -->
+	<insert id="insertArticleLike">
+		INSERT IGNORE INTO article_like(article_id, user_id)
+		VALUES(#{articleId}, #{userId})
+	</insert>
+
+	<!-- deleteArticleLike 게시글 좋아요 취소 -->
+	<delete id="deleteArticleLike">
+		DELETE FROM article_like
+		WHERE article_id = #{articleId} AND user_id = #{userId}
+	</delete>
+
+	<!-- countArticleLikes 게시글 좋아요 수 -->
+	<select id="countArticleLikes" resultType="int">
+		SELECT COUNT(*) FROM article_like
+		WHERE article_id = #{articleId}
+	</select>
+
+	<!-- existsArticleLike 특정 사용자의 좋아요 여부 -->
+	<select id="existsArticleLike" resultType="int">
+		SELECT COUNT(*) FROM article_like
+		WHERE article_id = #{articleId} AND user_id = #{userId}
+	</select>
+
+	<!-- selectArticlesByUser 사용자가 작성한 글 목록 -->
+	<select id="selectArticlesByUser" resultType="Board">
+		SELECT a.article_id AS articleId, a.user_id AS userId, a.title,
+			   (SELECT ai.image_url FROM article_img ai WHERE ai.article_id = a.article_id ORDER BY ai.display_order, ai.article_img_id LIMIT 1) AS imageUrl,
+			   a.created_at AS createdAt,
+			   a.test_drive_available AS testDriveAvailable,
+			   a.view_cnt AS viewCnt, a.brand_id AS brandId,
+			   COALESCE(b.brand_name, a.board_name) AS boardName,
+			   b.brand_name_ko AS boardNameKo
+		FROM article a
+		LEFT JOIN brand b ON a.brand_id = b.brand_id
+		WHERE a.user_id = #{userId}
+		ORDER BY a.created_at DESC
+	</select>
+
+	<!-- selectLikedArticlesByUser 사용자가 좋아요한 글 목록 -->
+	<select id="selectLikedArticlesByUser" resultType="Board">
+		SELECT a.article_id AS articleId, a.user_id AS userId, a.title,
+			   (SELECT ai.image_url FROM article_img ai WHERE ai.article_id = a.article_id ORDER BY ai.display_order, ai.article_img_id LIMIT 1) AS imageUrl,
+			   a.created_at AS createdAt,
+			   a.test_drive_available AS testDriveAvailable,
+			   a.view_cnt AS viewCnt, a.brand_id AS brandId,
+			   COALESCE(b.brand_name, a.board_name) AS boardName,
+			   b.brand_name_ko AS boardNameKo
+		FROM article a
+		JOIN article_like al ON al.article_id = a.article_id
+		LEFT JOIN brand b ON a.brand_id = b.brand_id
+		WHERE al.user_id = #{userId}
+		ORDER BY a.created_at DESC
+	</select>
+
+	<!-- selectCommentedArticlesByUser 사용자가 댓글을 단 글 목록 (중복 제거) -->
+	<select id="selectCommentedArticlesByUser" resultType="Board">
+		SELECT a.article_id AS articleId, a.user_id AS userId, a.title,
+			   (SELECT ai.image_url FROM article_img ai WHERE ai.article_id = a.article_id ORDER BY ai.display_order, ai.article_img_id LIMIT 1) AS imageUrl,
+			   a.created_at AS createdAt,
+			   a.test_drive_available AS testDriveAvailable,
+			   a.view_cnt AS viewCnt, a.brand_id AS brandId,
+			   COALESCE(b.brand_name, a.board_name) AS boardName,
+			   b.brand_name_ko AS boardNameKo
+		FROM article a
+		LEFT JOIN brand b ON a.brand_id = b.brand_id
+		WHERE a.article_id IN (SELECT c.article_id FROM comment c WHERE c.user_id = #{userId})
+		ORDER BY a.created_at DESC
+	</select>
+</mapper>

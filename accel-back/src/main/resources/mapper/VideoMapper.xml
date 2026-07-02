@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.accel.api.video.VideoDao">
+
+	<resultMap id="vehicleResultMap" type="Vehicle">
+		<id     property="vehicleId"   column="vehicle_id"/>
+		<result property="vehicleName"   column="vehicle_name"/>
+		<result property="vehicleNameKo" column="vehicle_name_ko"/>
+		<result property="category"    column="category"/>
+		<result property="segment"     column="segment"/>
+		<result property="bodyType"    column="body_type"/>
+		<result property="seating"     column="seating"/>
+		<result property="minPrice"    column="min_price"/>
+		<result property="maxPrice"    column="max_price"/>
+		<result property="description" column="description"/>
+		<result property="summary"     column="summary"/>
+		<result property="brandId"     column="brand_id"/>
+		<result property="brandName"   column="brand_name"/>
+		<result property="brandNameKo" column="brand_name_ko"/>
+		<result property="url"         column="url"/>
+		<result property="channelName" column="channel_name"/>
+		<result property="title"       column="title"/>
+		<collection property="fuelTypes" ofType="String" column="vehicle_id" select="selectFuelTypesByVehicleId"/>
+		<collection property="videos" column="vehicle_id" select="selectVideosByVehicleId"/>
+	</resultMap>
+
+	<resultMap id="videoResultMap" type="com.accel.api.video.Video">
+		<id     property="videoId"      column="video_id"/>
+		<result property="vehicleId"    column="vehicle_id"/>
+		<result property="displayOrder" column="display_order"/>
+		<result property="url"          column="url"/>
+		<result property="channelName"  column="channel_name"/>
+		<result property="title"        column="title"/>
+	</resultMap>
+
+	<select id="selectFuelTypesByVehicleId" resultType="String">
+		SELECT fuel_type
+		FROM vehicle_type
+		WHERE vehicle_id = #{_parameter}
+		ORDER BY fuel_type
+	</select>
+
+	<select id="selectVideosByVehicleId" resultMap="videoResultMap">
+		SELECT video_id, vehicle_id, display_order, url, channel_name, title
+		FROM video
+		WHERE vehicle_id = #{_parameter}
+		ORDER BY display_order, video_id
+	</select>
+
+	<!-- selectAllCategory: 모든 카테고리 목록 조회 -->
+	<select id="selectAllCategory" resultType="String">
+		SELECT DISTINCT category
+		FROM vehicle
+	</select>
+
+	<!-- searchVehicles: 동적 조건 필터 검색 (Video-02, Video-04 공용) -->
+	<select id="searchVehicles" resultMap="vehicleResultMap">
+		SELECT
+			ve.vehicle_id, ve.vehicle_name, ve.vehicle_name_ko, ve.category, ve.segment, ve.body_type,
+			ve.seating, ve.min_price, ve.max_price, ve.description, ve.summary,
+			ve.brand_id, ve.brand_name, ve.brand_name_ko,
+			vd.url, vd.channel_name, vd.title
+		FROM vehicle ve
+		LEFT JOIN video vd ON ve.vehicle_id = vd.vehicle_id AND vd.display_order = 1
+		<where>
+			<if test="category != null and category != ''">
+				ve.category = #{category}
+			</if>
+			<if test="segments != null and segments.size() > 0">
+				AND ve.segment IN
+				<foreach collection="segments" item="seg" open="(" separator="," close=")">
+					#{seg}
+				</foreach>
+			</if>
+			<if test="fuelTypes != null and fuelTypes.size() > 0">
+				AND ve.vehicle_id IN (
+					SELECT vehicle_id FROM vehicle_type WHERE fuel_type IN
+					<foreach collection="fuelTypes" item="ft" open="(" separator="," close=")">
+						#{ft}
+					</foreach>
+				)
+			</if>
+			<if test="minPrice != null">
+				AND ve.max_price >= #{minPrice}
+			</if>
+			<if test="maxPrice != null">
+				AND ve.min_price &lt;= #{maxPrice}
+			</if>
+			<if test="keyword != null and keyword != ''">
+				AND ve.vehicle_name LIKE CONCAT('%', #{keyword}, '%')
+			</if>
+		</where>
+	</select>
+
+	<!-- selectVehicle: 차량 ID로 차량+영상 상세 조회 -->
+	<select id="selectVehicle" resultMap="vehicleResultMap">
+		SELECT
+			ve.vehicle_id, ve.vehicle_name, ve.vehicle_name_ko, ve.category, ve.segment, ve.body_type,
+			ve.seating, ve.min_price, ve.max_price, ve.description, ve.summary,
+			ve.brand_id, ve.brand_name, ve.brand_name_ko,
+			vd.url, vd.channel_name, vd.title
+		FROM vehicle ve
+		LEFT JOIN video vd ON ve.vehicle_id = vd.vehicle_id AND vd.display_order = 1
+		WHERE ve.vehicle_id = #{vehicleId}
+	</select>
+
+</mapper>

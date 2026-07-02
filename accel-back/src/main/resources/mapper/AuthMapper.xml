@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.accel.api.auth.AuthDao">
+
+	<!-- 회원가입	-->
+	<insert id="signUp" parameterType="User">
+		INSERT INTO user (user_id, password, role, name, nickname, age, email, profile_img)
+		VALUES (#{userId}, #{password}, #{role}, #{name}, #{nickname}, #{age}, #{email}, #{profileImg})
+	</insert>
+	
+	<!-- 유저 아이디로 유저 정보 찾기 (findByUserId) -->
+	<select id="findByUserId" resultType="User">
+		SELECT user_id, password, role, name, nickname, age, email, profile_img
+		FROM user
+		WHERE user_id = #{userId} 
+	</select>
+
+	<insert id="insertRefreshToken">
+		INSERT INTO refresh_token (token_hash, user_id, expires_at, revoked)
+		VALUES (#{tokenHash}, #{userId}, #{expiresAt}, false)
+	</insert>
+
+	<select id="findRefreshToken" resultType="RefreshToken">
+		SELECT token_hash, user_id, expires_at, revoked, created_at
+		FROM refresh_token
+		WHERE token_hash = #{tokenHash}
+	</select>
+
+	<update id="revokeRefreshToken">
+		UPDATE refresh_token
+		SET revoked = true
+		WHERE token_hash = #{tokenHash}
+	</update>
+
+	<update id="revokeRefreshTokensByUserId">
+		UPDATE refresh_token
+		SET revoked = true
+		WHERE user_id = #{userId}
+	</update>
+
+	<insert id="insertRevokedAccessToken">
+		INSERT IGNORE INTO revoked_access_token (jwt_id, expires_at)
+		VALUES (#{jwtId}, #{expiresAt})
+	</insert>
+
+	<select id="existsActiveRevokedAccessToken" resultType="int">
+		SELECT COUNT(*)
+		FROM revoked_access_token
+		WHERE jwt_id = #{jwtId}
+		  AND expires_at > CURRENT_TIMESTAMP
+	</select>
+
+</mapper>

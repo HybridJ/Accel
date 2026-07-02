@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.accel.api.board.CommentDao">
+	
+	<!-- selectAllComments 한 게시글 내 모든 코멘트 조회 (좋아요 수/여부 포함) -->
+	<select id="selectAllComments" resultType="Comment">
+		SELECT c.comment_id AS commentId, c.user_id AS userId, c.content,
+			   c.created_at AS createdAt, c.updated_at AS updatedAt, c.article_id AS articleId,
+			   (SELECT COUNT(*) FROM comment_like cl WHERE cl.comment_id = c.comment_id) AS likeCount,
+			   (SELECT COUNT(*) FROM comment_like clu WHERE clu.comment_id = c.comment_id AND clu.user_id = #{userId}) AS liked
+		FROM comment c
+		WHERE c.article_id = #{articleId}
+		ORDER BY c.comment_id
+	</select>
+
+	<!-- insertCommentLike 댓글 좋아요 등록 (중복 시 무시) -->
+	<insert id="insertCommentLike">
+		INSERT IGNORE INTO comment_like(comment_id, user_id)
+		VALUES(#{commentId}, #{userId})
+	</insert>
+
+	<!-- deleteCommentLike 댓글 좋아요 취소 -->
+	<delete id="deleteCommentLike">
+		DELETE FROM comment_like
+		WHERE comment_id = #{commentId} AND user_id = #{userId}
+	</delete>
+
+	<!-- deleteCommentLikesByCommentId: remove dependent likes before deleting a comment -->
+	<delete id="deleteCommentLikesByCommentId">
+		DELETE FROM comment_like
+		WHERE comment_id = #{commentId}
+	</delete>
+
+	<!-- countCommentLikes 댓글 좋아요 수 -->
+	<select id="countCommentLikes" resultType="int">
+		SELECT COUNT(*) FROM comment_like
+		WHERE comment_id = #{commentId}
+	</select>
+
+	<!-- existsCommentLike 특정 사용자의 댓글 좋아요 여부 -->
+	<select id="existsCommentLike" resultType="int">
+		SELECT COUNT(*) FROM comment_like
+		WHERE comment_id = #{commentId} AND user_id = #{userId}
+	</select>
+	
+	<!-- insertComment 게시글에 댓글 작성 -->
+	<insert id="insertComment">
+		INSERT INTO comment (user_id, content, article_id)
+		VALUES (#{comment.userId}, #{comment.content}, #{comment.articleId})
+	</insert>
+	
+	<!-- selectComment commentId 기준으로 댓글 검색 -->
+	<select id="selectComment" resultType="Comment">
+		SELECT comment_id AS commentId, user_id AS userId, content,
+			   created_at AS createdAt, updated_at AS updatedAt, article_id AS articleId
+		FROM comment
+		WHERE comment_id = #{commentId}
+	</select>
+	
+	<!-- updateComment 댓글 수정 -->
+	<update id="updateComment">
+		UPDATE comment
+		<set>
+			<if test="comment.content != null and comment.content != ''">
+			content = #{comment.content}
+			</if>
+		</set>
+		WHERE comment_id = #{comment.commentId}
+	</update>
+	
+	<!-- deleteComment 댓글 삭제 -->
+	<delete id="deleteComment">
+		DELETE FROM comment
+		WHERE comment_id = #{commentId}
+	</delete>
+	
+</mapper>

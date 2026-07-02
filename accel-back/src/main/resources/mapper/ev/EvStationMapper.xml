@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.accel.api.ev.dao.EvStationDao">
+
+	<insert id="upsertStationBatch">
+		INSERT INTO ev_station
+			(cs_id, cs_nm, addr, lat, longi, created_at, updated_at)
+		VALUES
+		<foreach collection="list" item="s" separator=",">
+			(#{s.csId}, #{s.csNm}, #{s.addr}, #{s.lat}, #{s.longi}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		</foreach>
+		ON DUPLICATE KEY UPDATE
+			cs_nm = VALUES(cs_nm),
+			addr  = VALUES(addr),
+			lat   = VALUES(lat),
+			longi = VALUES(longi),
+			updated_at = CURRENT_TIMESTAMP
+	</insert>
+
+</mapper>
